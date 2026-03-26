@@ -1,3 +1,33 @@
-name: email-ops-env
-version: 1.0
-tasks: [easy, medium, hard]
+name: openenv-email-ops
+version: 1.0.0
+description: Enterprise email triage environment for AI operations agents.
+entrypoint: env.environment:EmailEnv
+entry_point: env.environment:EmailEnv
+tags:
+  - openenv
+  - rl
+  - enterprise-workflow
+  - email-triage
+domain: customer-operations
+observation_model: env.models:Observation
+action_model: env.models:Action
+reward_model: env.models:Reward
+tasks:
+  - id: email-triage-easy
+    difficulty: easy
+    objective: Handle routine inbox messages with correct response vs archive choices.
+    max_steps: 6
+  - id: email-triage-medium
+    difficulty: medium
+    objective: Mix of routine and high-risk requests requiring safe routing.
+    max_steps: 9
+  - id: email-triage-hard
+    difficulty: hard
+    objective: Legal/compliance/security heavy inbox with strict escalation policy.
+    max_steps: 12
+baseline:
+  script: baseline/run_baseline.py
+  provider: openai
+  model_env_var: OPENAI_MODEL
+validation:
+  command: openenv validate

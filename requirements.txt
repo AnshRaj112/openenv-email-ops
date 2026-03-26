@@ -2,3 +2,9 @@ pydantic
 google-genai
 groq
 python-dotenv
+openai
+pyyaml
+fastapi
+uvicorn
+gradio
+requests

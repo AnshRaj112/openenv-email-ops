@@ -1,8 +1,12 @@
 import os
 
 def llm_call(prompt):
-    if os.getenv("LLM_PROVIDER") == "gemini":
+    provider = os.getenv("LLM_PROVIDER", "openai").lower()
+    if provider == "gemini":
         from .gemini_client import generate as gemini_generate
         return gemini_generate(prompt)
-    from .groq_client import generate as groq_generate
-    return groq_generate(prompt)
+    if provider == "groq":
+        from .groq_client import generate as groq_generate
+        return groq_generate(prompt)
+    from .openai_client import generate as openai_generate
+    return openai_generate(prompt)
