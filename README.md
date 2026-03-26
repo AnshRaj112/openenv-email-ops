@@ -1,3 +1,16 @@
+---
+title: OpenEnv AI Ops Lab
+emoji: "🤖"
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 7860
+tags:
+  - openenv
+  - enterprise-ai
+  - email-triage
+---
+
 # OpenEnv AI Ops: Email Triage Environment
 
 Real-world OpenEnv environment for enterprise email operations.  

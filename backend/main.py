@@ -16,7 +16,7 @@ def home():
 
 
 @app.post("/run")
-def run(model: str = "groq"):
+def run(model: str = "local"):
     result = run_episode(model)
     score = result["score"]
     save_score(model, score)
