@@ -10,6 +10,14 @@ def generate(prompt):
     if not api_key:
         raise ValueError("OPENAI_API_KEY is not set")
 
+    # Helpful guardrail: users sometimes paste a different provider token here.
+    lowered = api_key.lower()
+    if "github_pat_" in lowered:
+        raise ValueError(
+            "OPENAI_API_KEY does not look like an OpenAI key (it looks like a GitHub token). "
+            "Replace OPENAI_API_KEY with your OpenAI API key."
+        )
+
     client = OpenAI(api_key=api_key)
     res = client.chat.completions.create(
         model=MODEL,

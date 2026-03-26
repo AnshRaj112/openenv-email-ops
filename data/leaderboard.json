@@ -10,5 +10,9 @@
   {
     "model": "gemini",
     "score": 1.0
+  },
+  {
+    "model": "groq",
+    "score": 1.0
   }
 ]

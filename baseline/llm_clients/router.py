@@ -8,5 +8,8 @@ def llm_call(prompt):
     if provider == "groq":
         from .groq_client import generate as groq_generate
         return groq_generate(prompt)
+    if provider == "local":
+        from .local_client import generate as local_generate
+        return local_generate(prompt)
     from .openai_client import generate as openai_generate
     return openai_generate(prompt)
