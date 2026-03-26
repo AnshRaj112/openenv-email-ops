@@ -1,7 +1,7 @@
 import gradio as gr
 import requests
 
-API = "http://localhost:8000"
+API = "http://localhost:7860"
 
 
 def run_model(provider):
@@ -40,4 +40,4 @@ with gr.Blocks() as app:
     refresh = gr.Button("Refresh Leaderboard")
     refresh.click(get_lb, outputs=lb)
 
-app.launch(server_name="0.0.0.0", server_port=7860)
+app.launch(server_name="0.0.0.0", server_port=8000)

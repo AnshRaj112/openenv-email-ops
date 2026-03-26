@@ -229,3 +229,24 @@ class HardTask(BaseEmailOpsTask):
 
 class ComplexTask(HardTask):
     name = "email-triage-complex"
+
+
+# OpenEnv/tasks.yaml uses `id` values. Keep a small registry so the
+# environment and API can instantiate tasks by `task_id`.
+TASK_REGISTRY = {
+    EasyTask.name: EasyTask,
+    MediumTask.name: MediumTask,
+    HardTask.name: HardTask,
+}
+
+
+def get_task(task_id: str):
+    """
+    Return a new task instance for the provided OpenEnv `task_id`.
+
+    If an unknown id is provided, fall back to the easy task to keep the
+    environment usable during validation and local dev.
+    """
+
+    task_cls = TASK_REGISTRY.get(task_id, EasyTask)
+    return task_cls()

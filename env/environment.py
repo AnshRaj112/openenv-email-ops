@@ -1,9 +1,32 @@
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Optional, Union
 from .models import Observation, Action, Reward
+from .tasks import EasyTask, get_task
 
 class EmailEnv:
-    def __init__(self, task):
-        self.task = task
+    def __init__(self, task: Optional[Union[object, str]] = None, task_id: Optional[str] = None):
+        """
+        OpenEnv-compatible environment wrapper.
+
+        Supports constructing with:
+        - an instantiated task object (must implement generate/evaluate/is_done)
+        - a `task_id` string from `openenv.yaml`
+        - no args (defaults to the easy task; useful for validation tools)
+        """
+
+        if task_id is not None and task is not None:
+            raise ValueError("Provide either `task` or `task_id`, not both.")
+
+        if task is None:
+            if task_id is not None:
+                self.task = get_task(task_id)
+            else:
+                self.task = EasyTask()
+        else:
+            # Accept either a task object or a task_id string for convenience.
+            if isinstance(task, str):
+                self.task = get_task(task)
+            else:
+                self.task = task
         self.state_data = None
         self.steps = 0
 

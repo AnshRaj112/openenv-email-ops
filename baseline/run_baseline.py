@@ -130,11 +130,17 @@ def run_task(task):
     return grade_episode(rewards)
 
 
-if __name__ == "__main__":
+def run_all_tasks():
     task_scores = {}
     for task in [EasyTask(), MediumTask(), HardTask()]:
         score = run_task(task)
         task_scores[task.name] = score
-        print(f"{task.name}: {score:.4f}")
-    overall = sum(task_scores.values()) / len(task_scores)
-    print(f"overall: {overall:.4f}")
+    overall = sum(task_scores.values()) / len(task_scores) if task_scores else 0.0
+    return {"task_scores": task_scores, "overall": overall}
+
+
+if __name__ == "__main__":
+    res = run_all_tasks()
+    for name, score in res["task_scores"].items():
+        print(f"{name}: {score:.4f}")
+    print(f"overall: {res['overall']:.4f}")

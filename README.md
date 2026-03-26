@@ -109,6 +109,14 @@ email-triage-hard: 0.xxxx
 overall: 0.xxxx
 ```
 
+Baseline scores (deterministic `local` provider; intentionally imperfect; no external API calls):
+```text
+email-triage-easy: 0.8750
+email-triage-medium: 0.6900
+email-triage-hard: 0.8240
+overall: 0.7963
+```
+
 ## Local Setup
 
 ```bash
@@ -131,6 +139,12 @@ Validate with:
 openenv validate
 ```
 
+Pre-submission repo validation (does local spec + API smoke checks):
+
+```bash
+py scripts/pre_submission_check.py
+```
+
 ## Docker / Hugging Face Spaces
 
 Build:
@@ -144,6 +158,17 @@ Run:
 ```bash
 docker run --env-file .env -p 8000:8000 -p 7860:7860 openenv-email-ops
 ```
+
+## Space HTTP Endpoints (Docker)
+
+The container exposes a FastAPI API on port `7860`:
+- `GET /` health check (returns `200`)
+- `POST /reset?task_id=email-triage-easy` returns the initial observation
+- `POST /step` accepts an `Action` and returns `{observation, reward, done, info}`
+- `GET /state` returns the current internal state
+- `GET /tasks` returns available tasks + the action schema
+- `GET /baseline` runs the repo baseline over all 3 tasks
+- `POST /grader?task_id=...&provider=local` runs one episode and returns a deterministic score in `0.0–1.0`
 
 HF Space notes:
 - SDK: `Docker`

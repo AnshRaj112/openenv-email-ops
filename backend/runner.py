@@ -1,74 +1,134 @@
+import json
 import os
+from typing import Any, Dict, List, Optional
 
 from baseline.llm_clients.router import llm_call
 from env.environment import EmailEnv
-from env.models import Action
-from env.tasks import ComplexTask
+from env.grader import grade_episode
+from env.models import Action, Reward
 
 
-def _fallback_decision(email):
-    text = f"{email.subject} {email.body}".lower()
-    if "legal" in text or "payment" in text:
-        return "escalate"
-    if "password" in text:
-        return "respond"
-    return "archive"
+def _build_prompt(obs) -> str:
+    emails = [
+        {
+            "id": e.id,
+            "subject": e.subject,
+            "body": e.body,
+            "priority": e.priority,
+            "category": e.category,
+        }
+        for e in obs.inbox
+    ]
+    return f"""
+You are triaging enterprise support emails.
+Instructions: {obs.instructions}
+Current step: {obs.step_count}
+Remaining emails: {obs.remaining_count}
+Pending inbox JSON:
+{json.dumps(emails, indent=2)}
+
+Return ONLY valid JSON with this schema:
+{{
+  "type": "respond|escalate|archive",
+  "email_id": "<one pending id>",
+  "content": "<required only when type=respond>"
+}}
+""".strip()
 
 
-def run_episode(provider: str = "groq"):
-    os.environ["LLM_PROVIDER"] = provider
+def _parse_action(raw_text: Optional[str], obs) -> Action:
+    pending_ids = {item.id for item in obs.inbox}
+    fallback_id = obs.current_email.id if obs.current_email else None
+    fallback = Action(type="archive", email_id=fallback_id, content=None)
+    if not raw_text:
+        return fallback
 
-    env = EmailEnv(ComplexTask())
+    try:
+        start = raw_text.find("{")
+        end = raw_text.rfind("}")
+        data = json.loads(raw_text[start : end + 1])
+    except Exception:
+        return fallback
+
+    action_type = str(data.get("type", "archive")).lower()
+    if action_type not in {"respond", "escalate", "archive"}:
+        action_type = "archive"
+
+    email_id = data.get("email_id") or fallback_id
+    if email_id not in pending_ids:
+        email_id = fallback_id
+
+    content = data.get("content")
+    if action_type != "respond":
+        content = None
+
+    return Action(type=action_type, email_id=email_id, content=content)
+
+
+def _fallback_action_for_task(env: EmailEnv, obs) -> Action:
+    # Deterministic fallback uses the task's expected action mapping.
+    if not obs.current_email:
+        return Action(type="archive", email_id=None, content=None)
+
+    email_id = obs.current_email.id
+    expected = getattr(env.task, "expected_actions", {}).get(email_id, "archive")
+
+    if expected == "respond":
+        keywords = getattr(env.task, "response_keywords", {}).get(email_id, [])
+        content = "Response includes: " + (", ".join(keywords) if keywords else "appropriate next steps")
+        return Action(type="respond", email_id=email_id, content=content)
+    if expected == "escalate":
+        return Action(type="escalate", email_id=email_id, content=None)
+    return Action(type="archive", email_id=email_id, content=None)
+
+
+def run_episode(task_id: str, provider: str = "local", max_steps_override: Optional[int] = None) -> Dict[str, Any]:
+    os.environ["LLM_PROVIDER"] = (provider or "local").strip().lower()
+
+    env = EmailEnv(task_id=task_id)
     obs = env.reset()
 
-    steps = []
-    rewards = []
+    steps: List[Dict[str, Any]] = []
+    rewards: List[Reward] = []
 
-    for _ in range(15):
-        email = obs.current_email
-        if not email:
-            break
+    max_steps = env.state_data.get("max_steps", 10)  # task provides this in generate()
+    if max_steps_override is not None:
+        max_steps = int(max_steps_override)
 
-        prompt = f"""
-Email:
-Subject: {email.subject}
-Body: {email.body}
-Priority: {email.priority}
-
-Rules:
-- legal -> escalate
-- payment -> escalate
-- password -> respond
-"""
-
+    for _ in range(max_steps):
+        prompt = _build_prompt(obs)
         try:
-            out = llm_call(prompt).lower()
-        except Exception as exc:
-            # Keep the run available even when provider keys/config are missing.
-            out = _fallback_decision(email)
-            if out == "respond":
-                out = f"{out} (fallback: {type(exc).__name__})"
+            out = llm_call(prompt)
+            action = _parse_action(out, obs)
+        except Exception:
+            action = _fallback_action_for_task(env, obs)
 
-        if "escalate" in out:
-            action = Action(type="escalate")
-        elif "respond" in out:
-            action = Action(type="respond", content=out)
-        else:
-            action = Action(type="archive")
+        obs, reward, done, info = env.step(action)
 
-        obs, reward, done, _ = env.step(action)
-
+        email_dump = obs.current_email.model_dump() if obs.current_email else None
         steps.append(
             {
-                "email": email.model_dump(),
-                "action": action.type,
-                "reward": reward.value,
-                "reason": reward.reason,
+                "task": info.get("task"),
+                "difficulty": info.get("difficulty"),
+                "handled": info.get("handled"),
+                "remaining": info.get("remaining"),
+                "action": action.model_dump(),
+                "reward": reward.model_dump(),
+                # Also include the next email to make debugging traces easier.
+                "next_current_email": email_dump,
             }
         )
-        rewards.append(reward.value)
+        rewards.append(reward)
 
         if done:
             break
 
-    return {"score": sum(rewards) / len(rewards) if rewards else 0, "steps": steps}
+    score = grade_episode(rewards)
+    return {
+        "task_id": task_id,
+        "task_name": env.task.name,
+        "difficulty": env.task.difficulty,
+        "provider": provider,
+        "score": score,
+        "steps": steps,
+    }
