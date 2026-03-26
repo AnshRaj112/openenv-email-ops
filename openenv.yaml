@@ -1,0 +1,3 @@
+name: email-ops-env
+version: 1.0
+tasks: [easy, medium, hard]
