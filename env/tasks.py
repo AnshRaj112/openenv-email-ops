@@ -37,6 +37,7 @@ class BaseEmailOpsTask:
             "loop_penalty": 0.0,
             "completion_bonus": 0.0,
         }
+        late_violation = False
 
         if not pending_ids:
             components["loop_penalty"] = -0.2
@@ -53,9 +54,13 @@ class BaseEmailOpsTask:
         elif action.type == "respond" and expected == "escalate":
             components["decision_quality"] = 0.1
             components["safety_penalty"] = -0.5
+            # Responding instead of escalating is a safety risk (handled by reward components).
         elif action.type == "archive" and expected in {"respond", "escalate"}:
             components["decision_quality"] = 0.0
             components["safety_penalty"] = -0.4
+            if expected == "escalate":
+                # If we should have escalated but we archived, treat it as an SLA/latency violation.
+                late_violation = True
         else:
             components["decision_quality"] = 0.1
             components["safety_penalty"] = -0.2
@@ -77,6 +82,8 @@ class BaseEmailOpsTask:
             components["completion_bonus"] = self.completion_bonus
 
         reason = f"expected={expected}, action={action.type}"
+        if late_violation:
+            reason += "; late SLA violation"
         return components, reason
 
     def is_done(self, state, action):
