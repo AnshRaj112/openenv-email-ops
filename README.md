@@ -177,7 +177,7 @@ docker run --env-file .env -p 8000:8000 -p 7860:7860 openenv-email-ops
 
 ## Space HTTP Endpoints (Docker)
 
-The container exposes a FastAPI API on port `8000`:
+The container exposes the FastAPI API and Gradio UI on port `7860`:
 - `GET /` health check (returns `200`)
 - `POST /reset?task_id=email-triage-easy` returns the initial observation
 - `POST /step` accepts an `Action` and returns `{observation, reward, done, info}`
@@ -185,8 +185,6 @@ The container exposes a FastAPI API on port `8000`:
 - `GET /tasks` returns available tasks + the action schema
 - `GET /baseline` runs the repo baseline over all 3 tasks
 - `POST /grader?task_id=...&provider=local` runs one episode and returns a deterministic score in `0.0–1.0`
-
-The Gradio dashboard is served on port `7860`.
 
 HF Space notes:
 - SDK: `Docker`
