@@ -55,8 +55,8 @@ def check_typed_models_and_env():
 def check_http_endpoints_with_testclient():
     client = TestClient(app)
 
-    r = client.get("/")
-    _assert(r.status_code == 200, "/ should return 200")
+    r = client.get("/health")
+    _assert(r.status_code == 200, "/health should return 200")
 
     r = client.get("/tasks")
     _assert(r.status_code == 200, "/tasks should return 200")

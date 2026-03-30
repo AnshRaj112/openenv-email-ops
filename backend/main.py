@@ -3,7 +3,6 @@ from typing import Any, Dict, Optional
 
 import yaml
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -20,23 +19,6 @@ app = FastAPI()
 
 _current_env: Optional[EmailEnv] = None
 _current_task_id: str = "email-triage-easy"
-
-
-@app.get("/")
-def home():
-    # Keep status 200 for local smoke checks while sending browser users to /ui.
-    return HTMLResponse(
-        """
-        <html>
-          <head>
-            <meta http-equiv="refresh" content="0; url=/ui" />
-          </head>
-          <body>
-            <a href="/ui">Open UI</a>
-          </body>
-        </html>
-        """
-    )
 
 
 @app.get("/health")

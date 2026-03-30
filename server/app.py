@@ -61,9 +61,8 @@ def main() -> None:
     if fastapi_app is None:  # pragma: no cover
         raise RuntimeError(f"Failed to import backend.main:app: {_import_error!r}")
 
-    # Keep OpenEnv HTTP API routes at root (/reset, /step, ...),
-    # and serve UI separately at /ui.
-    app = gr.mount_gradio_app(fastapi_app, _demo, path="/ui")
+    # Serve UI at root while keeping API endpoints exposed from FastAPI.
+    app = gr.mount_gradio_app(fastapi_app, _demo, path="/")
 
     # HF Spaces typically expects the app to listen on $PORT (default to 7860).
     port = int(os.getenv("PORT", "7860"))

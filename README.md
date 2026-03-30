@@ -168,8 +168,7 @@ docker run --env-file .env -p 8000:8000 -p 7860:7860 openenv-email-ops
 ## Space HTTP Endpoints (Docker)
 
 The container runs on port `7860`:
-- UI: `GET /` (redirects to Gradio UI at `/ui`)
-- UI: `GET /ui`
+- UI: `GET /`
 - API: `GET /health` returns healthy status
 - API: `POST /reset?task_id=email-triage-easy` returns the initial observation
 - API: `POST /step` accepts an `Action` and returns `{observation, reward, done, info}`
