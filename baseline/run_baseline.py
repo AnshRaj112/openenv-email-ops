@@ -9,31 +9,34 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-load_dotenv()
+# Load repo `.env` from project root so API keys work when cwd is not the repo.
+load_dotenv(PROJECT_ROOT / ".env")
 
 from env.environment import EmailEnv
 from env.tasks import EasyTask, MediumTask, HardTask
 from env.models import Action
 from env.grader import grade_episode
 from baseline.llm_clients.router import llm_call
+from baseline.llm_clients.heuristic_fallback import action_from_local_heuristic
 
-# Provider selection:
-# - Prefer OpenAI if the key looks valid.
-# - Otherwise use offline `local` provider so the baseline is free/reproducible.
-openai_key = os.getenv("OPENAI_API_KEY") or ""
+# Provider selection: Groq, Gemini, or local only.
+groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
+gemini_key = (os.getenv("GEMINI_API_KEY") or "").strip()
 provider = os.getenv("LLM_PROVIDER", "").strip().lower()
 
-if provider == "openai":
-    if ("github_pat_" in openai_key.lower()) or not (openai_key.startswith("sk-") or openai_key.startswith("proj-")):
-        provider = "local"
-
 if not provider:
-    if openai_key and (openai_key.startswith("sk-") or openai_key.startswith("proj-")):
-        provider = "openai"
+    if groq_key:
+        provider = "groq"
+    elif gemini_key:
+        provider = "gemini"
     else:
         provider = "local"
 
 os.environ["LLM_PROVIDER"] = provider
+
+# Log the first LLM failure once per process (all tasks may hit the same misconfiguration).
+_LLM_FAILURE_LOGGED = False
+
 
 def _build_prompt(obs):
     emails = [
@@ -88,38 +91,28 @@ def _parse_action(raw_text, obs):
         content = None
     return Action(type=action_type, email_id=email_id, content=content)
 
-def _fallback_action_for_task(task, obs):
-    if not obs.current_email:
-        return Action(type="archive", email_id=None, content=None)
-
-    email_id = obs.current_email.id
-    expected = getattr(task, "expected_actions", {}).get(email_id, "archive")
-
-    if expected == "respond":
-        keywords = getattr(task, "response_keywords", {}).get(email_id, [])
-        # Deterministic response content to keep grading stable.
-        content = "Response includes: " + (", ".join(keywords) if keywords else "appropriate next steps")
-        return Action(type="respond", email_id=email_id, content=content)
-
-    if expected == "escalate":
-        return Action(type="escalate", email_id=email_id, content=None)
-
-    return Action(type="archive", email_id=email_id, content=None)
-
-
 def run_task(task):
     env = EmailEnv(task)
     obs = env.reset()
     rewards = []
+    global _LLM_FAILURE_LOGGED
 
     for _ in range(task.max_steps):
         prompt = _build_prompt(obs)
         try:
             out = llm_call(prompt)
             action = _parse_action(out, obs)
-        except Exception:
-            # If provider credentials are missing/invalid, still run deterministically.
-            action = _fallback_action_for_task(task, obs)
+        except Exception as exc:
+            # Do not use expected_actions here — that oracle always scores ~1.0 on the grader.
+            # Fall back to the same heuristic as the `local` provider.
+            if not _LLM_FAILURE_LOGGED:
+                print(
+                    f"[baseline] LLM call failed ({exc!r}); "
+                    "using local heuristic fallback (scores will match LLM_PROVIDER=local).",
+                    file=sys.stderr,
+                )
+                _LLM_FAILURE_LOGGED = True
+            action = action_from_local_heuristic(prompt, _parse_action, obs)
 
         obs, reward, done, _ = env.step(action)
         rewards.append(reward)

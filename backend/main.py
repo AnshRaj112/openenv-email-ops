@@ -1,8 +1,12 @@
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 import yaml
 from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(_REPO_ROOT / ".env")
 
 from backend.analytics import analyze_run
 from backend.leaderboard import get_leaderboard, save_score
@@ -10,8 +14,6 @@ from backend.runner import run_episode
 from baseline.run_baseline import run_all_tasks
 from env.environment import EmailEnv
 from env.models import Action
-
-load_dotenv()
 
 app = FastAPI()
 

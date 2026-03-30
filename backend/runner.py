@@ -1,8 +1,10 @@
 import json
 import os
+import sys
 from typing import Any, Dict, List, Optional
 
 from baseline.llm_clients.router import llm_call
+from baseline.llm_clients.heuristic_fallback import action_from_local_heuristic
 from env.environment import EmailEnv
 from env.grader import grade_episode
 from env.models import Action, Reward
@@ -65,23 +67,6 @@ def _parse_action(raw_text: Optional[str], obs) -> Action:
     return Action(type=action_type, email_id=email_id, content=content)
 
 
-def _fallback_action_for_task(env: EmailEnv, obs) -> Action:
-    # Deterministic fallback uses the task's expected action mapping.
-    if not obs.current_email:
-        return Action(type="archive", email_id=None, content=None)
-
-    email_id = obs.current_email.id
-    expected = getattr(env.task, "expected_actions", {}).get(email_id, "archive")
-
-    if expected == "respond":
-        keywords = getattr(env.task, "response_keywords", {}).get(email_id, [])
-        content = "Response includes: " + (", ".join(keywords) if keywords else "appropriate next steps")
-        return Action(type="respond", email_id=email_id, content=content)
-    if expected == "escalate":
-        return Action(type="escalate", email_id=email_id, content=None)
-    return Action(type="archive", email_id=email_id, content=None)
-
-
 def run_episode(task_id: str, provider: str = "local", max_steps_override: Optional[int] = None) -> Dict[str, Any]:
     os.environ["LLM_PROVIDER"] = (provider or "local").strip().lower()
 
@@ -95,13 +80,20 @@ def run_episode(task_id: str, provider: str = "local", max_steps_override: Optio
     if max_steps_override is not None:
         max_steps = int(max_steps_override)
 
+    llm_failure_warned = False
     for _ in range(max_steps):
         prompt = _build_prompt(obs)
         try:
             out = llm_call(prompt)
             action = _parse_action(out, obs)
-        except Exception:
-            action = _fallback_action_for_task(env, obs)
+        except Exception as exc:
+            if not llm_failure_warned:
+                print(
+                    f"[runner] LLM call failed ({exc!r}); using local heuristic fallback.",
+                    file=sys.stderr,
+                )
+                llm_failure_warned = True
+            action = action_from_local_heuristic(prompt, _parse_action, obs)
 
         obs, reward, done, info = env.step(action)
 

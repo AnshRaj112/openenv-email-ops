@@ -27,7 +27,7 @@ tasks:
     max_steps: 12
 baseline:
   script: baseline/run_baseline.py
-  provider: openai
-  model_env_var: OPENAI_MODEL
+  provider: groq
+  model_env_var: GROQ_MODEL
 validation:
   command: openenv validate

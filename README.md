@@ -84,19 +84,35 @@ Task definitions are in `env/tasks.py`, graders in `env/grader.py`.
 
 Episode score is normalized to `[0.0, 1.0]` via deterministic grader logic.
 
-## Baseline Inference (OpenAI)
+## Baseline Inference (Groq / Gemini / Local)
 
-Baseline script: `baseline/run_baseline.py`
-- uses `OPENAI_API_KEY`
-- default model `OPENAI_MODEL=gpt-4o-mini`
-- deterministic configuration (`temperature=0`)
-- prints per-task scores + overall score
+Baseline script: `baseline/run_baseline.py` runs all three tasks and prints scores in `0.0–1.0`.
 
-Run:
+Remote inference uses **only** `GROQ_API_KEY` (Groq) and `GEMINI_API_KEY` (Google Gemini).
+
+- **Providers:** `groq`, `gemini`, or `local`.
+- **Groq:** `GROQ_API_KEY`, optional `GROQ_MODEL` (default `llama-3.3-70b-versatile`).
+- **Gemini:** `GEMINI_API_KEY`, optional `GEMINI_MODEL` (default `gemini-2.0-flash`).
+- **Auto-detect (no `LLM_PROVIDER`):** Groq if `GROQ_API_KEY` is set, else Gemini if `GEMINI_API_KEY` is set, else `local`.
+- **Local:** `LLM_PROVIDER=local` or no API keys.
+
+If a remote call fails, stderr logs once and the run falls back to the same heuristic as `local` (no label oracle).
+
+**Run with Groq:**
 
 ```bash
 py -m pip install -r requirements.txt
-set OPENAI_API_KEY=your_key_here
+set LLM_PROVIDER=groq
+set GROQ_API_KEY=gsk_your_key_here
+py baseline/run_baseline.py
+```
+
+**Run with Gemini:**
+
+```bash
+py -m pip install -r requirements.txt
+set LLM_PROVIDER=gemini
+set GEMINI_API_KEY=your_key_here
 py baseline/run_baseline.py
 ```
 
@@ -174,6 +190,5 @@ HF Space notes:
 - SDK: `Docker`
 - Add repo tag: `openenv`
 - Set secrets:
-  - `OPENAI_API_KEY`
-  - `GEMINI_API_KEY` (optional)
   - `GROQ_API_KEY` (optional)
+  - `GEMINI_API_KEY` (optional)
