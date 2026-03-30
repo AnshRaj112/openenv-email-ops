@@ -1,4 +1,3 @@
----
 title: OpenEnv AI Ops Lab
 emoji: "🤖"
 colorFrom: indigo
@@ -187,6 +186,7 @@ The container serves **Gradio UI on `/`** and mounts the **FastAPI API under `/a
 - API: `GET /api/baseline` runs the repo baseline over all 3 tasks
 - API: `POST /api/grader?task_id=...&provider=local` runs one episode and returns a deterministic score in `0.0–1.0`
 
+---
 HF Space notes:
 - SDK: `Docker`
 - Add repo tag: `openenv`
