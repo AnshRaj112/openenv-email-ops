@@ -1,5 +1,4 @@
 pydantic
-google-genai
 groq
 python-dotenv
 pyyaml

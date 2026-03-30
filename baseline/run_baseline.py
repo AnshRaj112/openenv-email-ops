@@ -19,16 +19,13 @@ from env.grader import grade_episode
 from baseline.llm_clients.router import llm_call
 from baseline.llm_clients.heuristic_fallback import action_from_local_heuristic
 
-# Provider selection: Groq, Gemini, or local only.
+# Provider selection: Groq or local only.
 groq_key = (os.getenv("GROQ_API_KEY") or "").strip()
-gemini_key = (os.getenv("GEMINI_API_KEY") or "").strip()
 provider = os.getenv("LLM_PROVIDER", "").strip().lower()
 
 if not provider:
     if groq_key:
         provider = "groq"
-    elif gemini_key:
-        provider = "gemini"
     else:
         provider = "local"
 

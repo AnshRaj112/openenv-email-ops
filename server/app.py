@@ -36,7 +36,7 @@ _task_choices = [
     "email-triage-hard",
 ]
 
-_provider_choices = ["local", "groq", "gemini"]
+_provider_choices = ["local", "groq"]
 
 
 _demo = gr.Interface(
