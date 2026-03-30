@@ -128,9 +128,9 @@ overall: 0.xxxx
 Baseline scores (deterministic `local` provider; intentionally imperfect; no external API calls):
 ```text
 email-triage-easy: 0.8750
-email-triage-medium: 0.6900
+email-triage-medium: 0.7129
 email-triage-hard: 0.8240
-overall: 0.7963
+overall: 0.8040
 ```
 
 ## Local Setup
@@ -177,7 +177,7 @@ docker run --env-file .env -p 8000:8000 -p 7860:7860 openenv-email-ops
 
 ## Space HTTP Endpoints (Docker)
 
-The container exposes a FastAPI API on port `7860`:
+The container exposes a FastAPI API on port `8000`:
 - `GET /` health check (returns `200`)
 - `POST /reset?task_id=email-triage-easy` returns the initial observation
 - `POST /step` accepts an `Action` and returns `{observation, reward, done, info}`
@@ -185,6 +185,8 @@ The container exposes a FastAPI API on port `7860`:
 - `GET /tasks` returns available tasks + the action schema
 - `GET /baseline` runs the repo baseline over all 3 tasks
 - `POST /grader?task_id=...&provider=local` runs one episode and returns a deterministic score in `0.0–1.0`
+
+The Gradio dashboard is served on port `7860`.
 
 HF Space notes:
 - SDK: `Docker`

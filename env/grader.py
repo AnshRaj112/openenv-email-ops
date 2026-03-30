@@ -26,10 +26,18 @@ def grade_episode(rewards):
     n = len(rewards)
     completion = any(r.components.get("completion_bonus", 0.0) > 0.0 for r in rewards)
 
-    # decision_quality is set to 0.6 iff `action.type == expected` in evaluate().
+    # decision_quality is set by `BaseEmailOpsTask.evaluate()`:
+    # - correct routing: 0.6
+    # - wrong routing (but somewhat aligned): 0.1
+    # - wrong & highly misaligned: 0.0
+    # Give partial credit proportionally instead of a hard threshold.
     decision_steps = [r for r in rewards]
     correctness_ratio = (
-        sum(1 for r in decision_steps if r.components.get("decision_quality", 0.0) >= 0.6 - 1e-9) / n
+        sum(
+            max(0.0, min(1.0, (r.components.get("decision_quality", 0.0) / 0.6)))
+            for r in decision_steps
+        )
+        / n
     )
 
     respond_steps = []

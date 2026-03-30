@@ -1,4 +1,6 @@
 from copy import deepcopy
+import random
+from typing import Optional, Dict, Any
 
 
 class BaseEmailOpsTask:
@@ -12,14 +14,60 @@ class BaseEmailOpsTask:
     )
     emails = []
     expected_actions = {}
-    response_keywords = {}
 
-    def generate(self):
+    # Populated dynamically in `generate()` to support deterministic per-episode variation.
+    response_keywords: Dict[str, list] = {}
+
+    # Per-respond-email spec for generating the required response keywords and embedding
+    # the chosen token into the email body (so an agent has a chance to respond correctly).
+    #
+    # Example:
+    # response_keyword_specs = {
+    #   "e1": {"first_keyword": "reset", "second_candidates": ["link", "secure"]}
+    # }
+    response_keyword_specs: Dict[str, Dict[str, Any]] = {}
+
+    def generate(self, seed: Optional[int] = None):
+        rng = random.Random(seed if seed is not None else 0)
+
+        emails = deepcopy(self.emails)
+        self.response_keywords = {}
+
+        specs = self.response_keyword_specs or {}
+        used_ids = set()
+        for e in emails:
+            template_id = str(e.get("id"))
+
+            # Prevent memorization by randomizing the visible email id per episode.
+            # Response grading still keys off `response_keywords`, which we assign
+            # to the randomized ids below.
+            for _ in range(50):
+                candidate = f"{template_id}_{rng.randint(1000, 9999)}"
+                if candidate not in used_ids:
+                    used_ids.add(candidate)
+                    break
+            else:
+                candidate = f"{template_id}_{rng.randint(1000, 9999)}"
+
+            e["id"] = candidate
+
+            spec = specs.get(template_id)
+            if not spec:
+                continue
+
+            token = rng.choice(spec["second_candidates"])
+            body_template = str(e.get("body", ""))
+            if "{token}" in body_template:
+                e["body"] = body_template.format(token=token)
+
+            # Two keywords are required for a "perfect" response step in `env/grader.py`.
+            self.response_keywords[candidate] = [spec["first_keyword"], token]
+
         return {
             "task_name": self.name,
             "difficulty": self.difficulty,
-            "emails": deepcopy(self.emails),
-            "pending_ids": [e["id"] for e in self.emails],
+            "emails": emails,
+            "pending_ids": [e["id"] for e in emails],
             "current_index": 0,
             "handled_ids": [],
             "history": [],
@@ -27,6 +75,19 @@ class BaseEmailOpsTask:
             "max_steps": self.max_steps,
             "instructions": self.instructions,
         }
+
+    def expected_action_for_email(self, email: Dict[str, Any]) -> str:
+        """
+        Policy-derived expected action (prevents overfitting to fixed email ids).
+        """
+        category = str(email.get("category", "")).lower()
+        if category in {"legal", "compliance", "payment", "security"}:
+            return "escalate"
+        if category in {"account", "access", "billing"}:
+            return "respond"
+        if category in {"newsletter", "product"}:
+            return "archive"
+        return "archive"
 
     def evaluate(self, state, action):
         pending_ids = state["pending_ids"]
@@ -48,7 +109,8 @@ class BaseEmailOpsTask:
             components["loop_penalty"] = -0.3
             return components, "invalid email id or already handled"
 
-        expected = self.expected_actions[target_id]
+        target_email = next((e for e in state["emails"] if str(e.get("id")) == str(target_id)), {})
+        expected = self.expected_action_for_email(target_email)
         if action.type == expected:
             components["decision_quality"] = 0.6
         elif action.type == "respond" and expected == "escalate":
@@ -98,7 +160,7 @@ class EasyTask(BaseEmailOpsTask):
         {
             "id": "e1",
             "subject": "Password reset help",
-            "body": "I cannot access my account, please share reset steps.",
+            "body": "I cannot access my account. Please share reset steps. We also need the {token} details for verification.",
             "priority": "low",
             "sender": "user101@client.com",
             "category": "account",
@@ -114,14 +176,17 @@ class EasyTask(BaseEmailOpsTask):
         {
             "id": "e3",
             "subject": "Invoice copy request",
-            "body": "Need a copy of last month's invoice for expense filing.",
+            "body": "Need a copy of last month's invoice for expense filing. The {token} will confirm authenticity.",
             "priority": "low",
             "sender": "ops-team@client.com",
             "category": "billing",
         },
     ]
     expected_actions = {"e1": "respond", "e2": "archive", "e3": "respond"}
-    response_keywords = {"e1": ["reset", "link"], "e3": ["invoice", "attached"]}
+    response_keyword_specs = {
+        "e1": {"first_keyword": "reset", "second_candidates": ["link", "secure"]},
+        "e3": {"first_keyword": "invoice", "second_candidates": ["attached", "PDF"]},
+    }
 
 
 class MediumTask(BaseEmailOpsTask):
@@ -140,7 +205,7 @@ class MediumTask(BaseEmailOpsTask):
         {
             "id": "m2",
             "subject": "Account access blocked",
-            "body": "MFA challenge not working since yesterday.",
+            "body": "MFA challenge not working since yesterday. I need the {token} guidance to complete verification.",
             "priority": "medium",
             "sender": "employee@client.com",
             "category": "access",
@@ -168,7 +233,9 @@ class MediumTask(BaseEmailOpsTask):
         "m3": "escalate",
         "m4": "archive",
     }
-    response_keywords = {"m2": ["mfa", "support"], "m4": []}
+    response_keyword_specs = {
+        "m2": {"first_keyword": "mfa", "second_candidates": ["support", "ticket", "help"]},
+    }
 
 
 class HardTask(BaseEmailOpsTask):
@@ -203,7 +270,7 @@ class HardTask(BaseEmailOpsTask):
         {
             "id": "h4",
             "subject": "Routine password reset",
-            "body": "Need reset link for returning contractor.",
+            "body": "Need reset link for returning contractor. Provide a {token} token so we can proceed securely.",
             "priority": "low",
             "sender": "contractor@client.com",
             "category": "account",
@@ -224,7 +291,9 @@ class HardTask(BaseEmailOpsTask):
         "h4": "respond",
         "h5": "archive",
     }
-    response_keywords = {"h4": ["reset", "secure"]}
+    response_keyword_specs = {
+        "h4": {"first_keyword": "reset", "second_candidates": ["secure", "token", "verification"]},
+    }
 
 
 class ComplexTask(HardTask):

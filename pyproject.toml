@@ -1,0 +1,14 @@
+[project]
+name = "openenv-email-ops"
+version = "1.0.0"
+description = "Enterprise email triage environment for AI operations agents."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["openenv-core>=0.2.0"]
+
+[project.scripts]
+server = "server.app:main"
+
+[tool.setuptools]
+packages = []
+

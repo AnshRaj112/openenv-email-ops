@@ -29,9 +29,13 @@ class EmailEnv:
                 self.task = task
         self.state_data = None
         self.steps = 0
+        # Deterministic per-env episode seed so environment instances are reproducible.
+        self.episode_count = 0
 
     def reset(self) -> Observation:
-        self.state_data = self.task.generate()
+        self.episode_count += 1
+        # Tasks may use the seed to deterministically vary content/labels per episode.
+        self.state_data = self.task.generate(seed=self.episode_count)
         self.steps = 0
         return self._get_obs()
 
