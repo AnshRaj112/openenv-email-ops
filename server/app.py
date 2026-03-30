@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 
+from fastapi import FastAPI
 import uvicorn
 import gradio as gr
 
@@ -61,12 +62,15 @@ def main() -> None:
     if fastapi_app is None:  # pragma: no cover
         raise RuntimeError(f"Failed to import backend.main:app: {_import_error!r}")
 
-    # Mount the Gradio UI so HF Spaces renders immediately.
-    gr.mount_gradio_app(fastapi_app, _demo, path="/")
+    # HF Spaces renders the root ("/"). Our backend already defines GET /,
+    # so we wrap it: UI at "/", API under "/api".
+    app = FastAPI()
+    app.mount("/api", fastapi_app)
+    app = gr.mount_gradio_app(app, _demo, path="/")
 
     # HF Spaces typically expects the app to listen on $PORT (default to 7860).
     port = int(os.getenv("PORT", "7860"))
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":
