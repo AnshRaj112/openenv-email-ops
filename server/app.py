@@ -23,7 +23,7 @@ except Exception:  # pragma: no cover
 
 def _run_episode_ui(task_id: str, provider: str):
     # Always returns a graded score + trace; when provider keys are missing,
-    # `run_episode()` will fall back to the same behavior as `LLM_PROVIDER=local`.
+    # `run_episode()` will use the same deterministic fallback behavior.
     if run_episode is None:  # pragma: no cover
         raise RuntimeError("Failed to import backend.runner.run_episode")
     result = run_episode(task_id=task_id, provider=provider)
@@ -36,14 +36,14 @@ _task_choices = [
     "email-triage-hard",
 ]
 
-_provider_choices = ["local", "groq"]
+_provider_choices = ["openai"]
 
 
 _demo = gr.Interface(
     fn=_run_episode_ui,
     inputs=[
         gr.Dropdown(choices=_task_choices, value="email-triage-easy", label="Task"),
-        gr.Dropdown(choices=_provider_choices, value="local", label="Provider"),
+        gr.Dropdown(choices=_provider_choices, value="openai", label="Provider"),
     ],
     outputs=[gr.Number(label="Score"), gr.JSON(label="Step Trace")],
     title="OpenEnv Email Triage",

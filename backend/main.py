@@ -86,14 +86,14 @@ def baseline():
 
 
 @app.post("/grader")
-def grader(task_id: str = "email-triage-easy", provider: str = "local"):
+def grader(task_id: str = "email-triage-easy", provider: str = "openai"):
     result = run_episode(task_id=task_id, provider=provider)
     # `run_episode` already returns a deterministic 0.0-1.0 grader score.
     return {"task_id": task_id, "score": result["score"], "steps": result["steps"]}
 
 
 @app.post("/run")
-def run(task_id: str = "email-triage-complex", provider: str = "local"):
+def run(task_id: str = "email-triage-complex", provider: str = "openai"):
     result = run_episode(task_id=task_id, provider=provider)
     score = result["score"]
     save_score(provider, score)

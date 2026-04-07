@@ -26,7 +26,7 @@ def get_lb():
 with gr.Blocks() as app:
     gr.Markdown("# AI Ops Lab Dashboard")
 
-    provider = gr.Dropdown(["local", "groq"], value="local", label="Provider")
+    provider = gr.Dropdown(["openai"], value="openai", label="Provider")
     run_btn = gr.Button("Run Agent")
 
     score = gr.Number(label="Score")

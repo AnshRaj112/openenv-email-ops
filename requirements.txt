@@ -6,3 +6,4 @@ fastapi
 uvicorn
 gradio
 requests
+openai
