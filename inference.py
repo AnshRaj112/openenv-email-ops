@@ -1,21 +1,27 @@
 from __future__ import annotations
 
-from baseline.run_baseline import run_all_tasks
+from baseline.run_baseline import HardTask, EasyTask, MediumTask, run_task
 
 
 def run_inference():
     """
     Root-level inference entrypoint expected by some OpenEnv checkers.
-    Delegates to the repository baseline implementation.
+    Emits structured stdout blocks expected by OpenEnv validators.
     """
-    return run_all_tasks()
+    task_scores = {}
+    for task in [EasyTask(), MediumTask(), HardTask()]:
+        print(f"[START] task={task.name}", flush=True)
+        score = float(run_task(task))
+        # Baseline task runner returns a final episode score only.
+        print(f"[STEP] step=1 reward={score:.4f}", flush=True)
+        print(f"[END] task={task.name} score={score:.4f} steps=1", flush=True)
+        task_scores[task.name] = score
+    overall = sum(task_scores.values()) / len(task_scores) if task_scores else 0.0
+    return {"task_scores": task_scores, "overall": overall}
 
 
 def main() -> None:
-    res = run_inference()
-    for name, score in res.get("task_scores", {}).items():
-        print(f"{name}: {score:.4f}")
-    print(f"overall: {res.get('overall', 0.0):.4f}")
+    run_inference()
 
 
 if __name__ == "__main__":
