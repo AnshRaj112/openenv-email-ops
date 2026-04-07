@@ -1,9 +1,12 @@
-FROM python:3.10
+ARG PYTHON_IMAGE=public.ecr.aws/docker/library/python:3.10-slim
+FROM ${PYTHON_IMAGE}
 
 WORKDIR /app
-COPY . .
 
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
 
 EXPOSE 8000 7860
 
