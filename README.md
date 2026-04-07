@@ -84,29 +84,48 @@ Task definitions are in `env/tasks.py`, graders in `env/grader.py`.
 
 Episode score is normalized to `[0.0, 1.0]` via deterministic grader logic.
 
-## Baseline Inference (Groq / Local)
+## Submission inference (`inference.py`)
 
-Baseline script: `baseline/run_baseline.py` runs all three tasks and prints scores in `0.0–1.0`.
+Phase 2 expects a root-level `inference.py` that:
 
-Remote inference uses **only** `GROQ_API_KEY` (Groq).
+- Uses the **OpenAI Python client** with the injected proxy:
+  - `base_url` from `API_BASE_URL`
+  - `api_key` from `API_KEY` or `HF_TOKEN` (either is accepted)
+- Runs the three tasks (`EasyTask`, `MediumTask`, `HardTask`) against `EmailEnv`.
+- Prints structured lines to **stdout** (with `flush=True`), one episode per task:
+  - `[START] task=... env=... model=...`
+  - `[STEP] step=... action=... reward=... done=... error=...` (once per `env.step`)
+  - `[END] success=... steps=... score=... rewards=...`
 
-- **Providers:** `groq` or `local`.
-- **Groq:** `GROQ_API_KEY`, optional `GROQ_MODEL` (default `llama-3.3-70b-versatile`).
-- **Auto-detect (no `LLM_PROVIDER`):** Groq if `GROQ_API_KEY` is set, else `local`.
-- **Local:** `LLM_PROVIDER=local` or no API keys.
+### Mandatory environment variables (hackathon / validator)
 
-If a remote call fails, stderr logs once and the run falls back to the same heuristic as `local` (no label oracle).
+Define these in the platform’s environment configuration (or a local `.env` for testing):
 
-**Run with Groq:**
+| Variable | Purpose |
+|----------|---------|
+| `API_BASE_URL` | LLM API base URL (LiteLLM / OpenAI-compatible proxy). |
+| `API_KEY` or `HF_TOKEN` | Auth for the proxy; `inference.py` uses one or the other. |
+| `MODEL_NAME` | Model id passed to `chat.completions.create`. |
+| `LOCAL_IMAGE_NAME` | Only required if you load the env via `from_docker_image(...)`; otherwise optional. |
+
+Do not hardcode secrets in the repo; rely on injected env vars in CI.
+
+## Baseline script (optional, local dev)
+
+`baseline/run_baseline.py` runs all three tasks and prints plain score lines (not the submission stdout format).
+
+The baseline router defaults to provider `openai` and maps legacy `local` / `groq` names to the same deterministic fallback client used for offline runs.
+
+If a remote call fails, stderr logs once and the run falls back to the same heuristic as the offline client (no label oracle).
+
+**Run baseline locally:**
 
 ```bash
 py -m pip install -r requirements.txt
-set LLM_PROVIDER=groq
-set GROQ_API_KEY=gsk_your_key_here
 py baseline/run_baseline.py
 ```
 
-Expected output format:
+Expected baseline output format:
 
 ```text
 email-triage-easy: 0.xxxx
@@ -115,7 +134,7 @@ email-triage-hard: 0.xxxx
 overall: 0.xxxx
 ```
 
-Baseline scores (deterministic `local` provider; intentionally imperfect; no external API calls):
+Baseline scores (deterministic offline provider; intentionally imperfect; no external API calls):
 ```text
 email-triage-easy: 0.8750
 email-triage-medium: 0.7129
@@ -153,16 +172,20 @@ py scripts/pre_submission_check.py
 
 ## Docker / Hugging Face Spaces
 
-Build:
+The `Dockerfile` uses a public mirror base image (`public.ecr.aws/docker/library/python:3.10-slim`) to reduce Docker Hub pull issues in CI.
+
+Build (requires Docker Desktop or another engine running):
 
 ```bash
-docker build -t openenv-email-ops .
+docker build -t openenv-email-ops:latest .
 ```
+
+Set `LOCAL_IMAGE_NAME=openenv-email-ops:latest` only if your workflow uses that image name with `from_docker_image(...)`.
 
 Run:
 
 ```bash
-docker run --env-file .env -p 8000:8000 -p 7860:7860 openenv-email-ops
+docker run --env-file .env -p 8000:8000 -p 7860:7860 openenv-email-ops:latest
 ```
 
 ## Space HTTP Endpoints (Docker)
@@ -175,11 +198,14 @@ The container runs on port `7860`:
 - API: `GET /state` returns the current internal state
 - API: `GET /tasks` returns available tasks + the action schema
 - API: `GET /baseline` runs the repo baseline over all 3 tasks
-- API: `POST /grader?task_id=...&provider=local` runs one episode and returns a deterministic score in `0.0–1.0`
+- API: `POST /grader?task_id=...&provider=openai` runs one episode and returns a deterministic score in `0.0–1.0`
 
 ---
 HF Space notes:
 - SDK: `Docker`
 - Add repo tag: `openenv`
-- Set secrets:
-  - `GROQ_API_KEY` (optional)
+- Set secrets / environment variables for inference and the app as required by the platform, for example:
+  - `API_BASE_URL`
+  - `API_KEY` or `HF_TOKEN`
+  - `MODEL_NAME`
+  - Optional: `LOCAL_IMAGE_NAME` (only if using docker-image–based env loading)
